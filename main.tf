@@ -72,10 +72,11 @@ resource "null_resource" "remote-config" {
             type = "ssh"
             user = local.ssh_user
             private_key = file(local.private_key_path)
-            host = aws_instance.nginx.public_ip 
+            ##host = aws_instance.nginx.public_ip 
+            host = aws_eip.nginx_eip.public_ip
         }
     }
-  depends_on = [aws_instance.nginx]
+  depends_on = [aws_instance.nginx, aws_eip_association.eip-assoc]
   ##depends_on = [aws_instance.re, aws_eip_association.re-eip-assoc, null_resource.inventory-setup, null_resource.ssh-setup]
 }
 
@@ -85,7 +86,7 @@ resource "null_resource" "remote-config" {
 resource "null_resource" "ansible-run" {
   ###count = var.data-node-count
   provisioner "local-exec" {
-    command = "ansible-playbook  -i ${aws_instance.nginx.public_ip}, --private-key ${local.private_key_path} nginx.yaml"
+    command = "ansible-playbook  -i ${aws_eip.nginx_eip.public_ip}, --private-key ${local.private_key_path} nginx.yaml"
     }
   depends_on = [null_resource.remote-config]
 }
