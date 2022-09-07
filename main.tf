@@ -45,13 +45,6 @@ resource "aws_security_group" "nginx" {
     }
 }
 
-##python -m pip install --user ansible
-
-# "echo 'Wait until SSH is ready'", "sleep 5",
-#                     "sudo apt update","sudo apt upgrade -y", "sleep 5",
-#                     "sudo apt install ansible -y", "sleep 5",
-#                     "ansible --version"
-
 resource "aws_instance" "nginx" {
     ami = data.aws_ami.re-ami.id
     subnet_id = aws_subnet.re_subnet1.id
@@ -60,7 +53,19 @@ resource "aws_instance" "nginx" {
     security_groups = [aws_security_group.nginx.id]
     key_name = var.ssh_key_name
 
-    provisioner "remote-exec" {
+  tags = {
+    Name = format("%s-%s-node", var.base_name, var.region),
+    Owner = var.owner
+  }
+}
+
+
+############################
+# instead of running this inside aws_instance, run it outside with null resource
+# ensure we can get to the node first
+resource "null_resource" "remote-config" {
+  ##count = var.data-node-count
+  provisioner "remote-exec" {
         inline = ["echo 'Wait until SSH is ready'"]
 
         connection {
@@ -70,17 +75,22 @@ resource "aws_instance" "nginx" {
             host = aws_instance.nginx.public_ip 
         }
     }
-    provisioner "local-exec" {
-      command = "ansible-playbook  -i ${aws_instance.nginx.public_ip}, --private-key ${local.private_key_path} nginx.yaml"
-    }
-
-  tags = {
-    Name = format("%s-%s-node", var.base_name, var.region),
-    Owner = var.owner
-  }
-
-
+  depends_on = [aws_instance.nginx]
+  ##depends_on = [aws_instance.re, aws_eip_association.re-eip-assoc, null_resource.inventory-setup, null_resource.ssh-setup]
 }
+
+
+######################
+# Run some ansible
+resource "null_resource" "ansible-run" {
+  ###count = var.data-node-count
+  provisioner "local-exec" {
+    command = "ansible-playbook  -i ${aws_instance.nginx.public_ip}, --private-key ${local.private_key_path} nginx.yaml"
+    }
+  depends_on = [null_resource.remote-config]
+}
+
+
 
 output "nginx_ip" {
     value = aws_instance.nginx.public_ip
