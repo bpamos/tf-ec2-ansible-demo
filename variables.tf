@@ -74,8 +74,12 @@ variable "node-root-size" {
 # EBS volume for persistent and ephemeral storage
 
 ### must import "local variable to use this"
-# variable "enable-volumes" {
-#   description = "Enable EBS Devices for Ephemeral and Persistent storage"
-#   default     = true
-# }
+variable "enable-volumes" {
+  description = "Enable EBS Devices for Ephemeral and Persistent storage"
+  default     = true
+}
 
+variable "re-volume-size" {
+  description = "The size of the ephemeral and persistent volumes to attach"
+  default     = "150"
+}

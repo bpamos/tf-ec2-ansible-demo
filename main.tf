@@ -63,38 +63,6 @@ resource "aws_instance" "nginx" {
   }
 }
 
-
-############################
-# instead of running this inside aws_instance, run it outside with null resource
-# ensure we can get to the node first
-resource "null_resource" "remote-config" {
-  count = var.data-node-count
-  provisioner "remote-exec" {
-        inline = ["echo 'Wait until SSH is ready'"]
-
-        connection {
-            type = "ssh"
-            user = local.ssh_user
-            private_key = file(local.private_key_path)
-            ##host = aws_instance.nginx.public_ip 
-            host = element(aws_eip.nginx_eip.*.public_ip, count.index)
-        }
-    }
-  depends_on = [aws_instance.nginx, aws_eip_association.eip-assoc]
-  ##depends_on = [aws_instance.re, aws_eip_association.re-eip-assoc, null_resource.inventory-setup, null_resource.ssh-setup]
-}
-
-
-######################
-# Run some ansible
-resource "null_resource" "ansible-run" {
-  count = var.data-node-count
-  provisioner "local-exec" {
-    command = "ansible-playbook  -i ${element(aws_eip.nginx_eip.*.public_ip, count.index)}, --private-key ${local.private_key_path} nginx.yaml"
-    }
-  depends_on = [null_resource.remote-config]
-}
-
 ##command = "ansible-playbook  -i ${aws_eip.nginx_eip.public_ip}, --private-key ${local.private_key_path} nginx.yaml"
 
 # output "nginx_ip" {
