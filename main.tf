@@ -45,16 +45,20 @@ resource "aws_security_group" "nginx" {
     }
 }
 
+
+#########################
+
 resource "aws_instance" "nginx" {
-    ami = data.aws_ami.re-ami.id
-    subnet_id = aws_subnet.re_subnet1.id
-    instance_type = var.re_instance_type
+    count                       = var.data-node-count
+    ami                         = data.aws_ami.re-ami.id
+    subnet_id                   = aws_subnet.re_subnet1.id
+    instance_type               = var.re_instance_type
     associate_public_ip_address = true
-    security_groups = [aws_security_group.nginx.id]
-    key_name = var.ssh_key_name
+    security_groups             = [aws_security_group.nginx.id]
+    key_name                    = var.ssh_key_name
 
   tags = {
-    Name = format("%s-%s-node", var.base_name, var.region),
+    Name = format("%s-%s-node-%s", var.base_name, var.region, count.index+1),
     Owner = var.owner
   }
 }
@@ -64,7 +68,7 @@ resource "aws_instance" "nginx" {
 # instead of running this inside aws_instance, run it outside with null resource
 # ensure we can get to the node first
 resource "null_resource" "remote-config" {
-  ##count = var.data-node-count
+  count = var.data-node-count
   provisioner "remote-exec" {
         inline = ["echo 'Wait until SSH is ready'"]
 
@@ -73,7 +77,7 @@ resource "null_resource" "remote-config" {
             user = local.ssh_user
             private_key = file(local.private_key_path)
             ##host = aws_instance.nginx.public_ip 
-            host = aws_eip.nginx_eip.public_ip
+            host = element(aws_eip.nginx_eip.*.public_ip, count.index)
         }
     }
   depends_on = [aws_instance.nginx, aws_eip_association.eip-assoc]
@@ -84,15 +88,15 @@ resource "null_resource" "remote-config" {
 ######################
 # Run some ansible
 resource "null_resource" "ansible-run" {
-  ###count = var.data-node-count
+  count = var.data-node-count
   provisioner "local-exec" {
-    command = "ansible-playbook  -i ${aws_eip.nginx_eip.public_ip}, --private-key ${local.private_key_path} nginx.yaml"
+    command = "ansible-playbook  -i ${element(aws_eip.nginx_eip.*.public_ip, count.index)}, --private-key ${local.private_key_path} nginx.yaml"
     }
   depends_on = [null_resource.remote-config]
 }
 
+##command = "ansible-playbook  -i ${aws_eip.nginx_eip.public_ip}, --private-key ${local.private_key_path} nginx.yaml"
 
-
-output "nginx_ip" {
-    value = aws_instance.nginx.public_ip
-}
+# output "nginx_ip" {
+#     value = aws_instance.nginx.public_ip
+# }

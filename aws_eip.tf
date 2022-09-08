@@ -3,11 +3,12 @@
 # # and attached as the public IP address to each Redis Cluster EC2.
 
 resource "aws_eip" "nginx_eip" {
+  count = var.data-node-count
   network_border_group = var.region
   vpc      = true
 
   tags = {
-      Name = format("%s-%s-eip", var.base_name, var.region),
+      Name = format("%s-%s-eip-%s", var.base_name, var.region, count.index+1),
       Owner = var.owner
   }
 
@@ -17,7 +18,9 @@ resource "aws_eip" "nginx_eip" {
 
 #associate aws eips created in "aws_eip.tf" to each instance
 resource "aws_eip_association" "eip-assoc" {
-  instance_id   = aws_instance.nginx.id
-  allocation_id = aws_eip.nginx_eip.id
+  count         = var.data-node-count
+  instance_id   = element(aws_instance.nginx.*.id, count.index)
+  allocation_id = element(aws_eip.nginx_eip.*.id, count.index)
+
   depends_on    = [aws_instance.nginx, aws_eip.nginx_eip]
 }
